@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A replicate-aware CRISPRi target gate and intracranial LNP screen design prepared by Cathy Liu for the Liu Lab at UCSF.">
+  <title>Exploratory Analyses Inspired by the Liu Lab</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+  <main class="page">
+    <h1>Exploratory Analyses Inspired by the Liu Lab</h1>
+    <div class="byline">
+      Cathy Liu · Cancer biology and functional genomics · <a href="mailto:cathyliu014@gmail.com">cathyliu014@gmail.com</a><br>
+      Prepared for the Liu Lab, UC San Francisco<br>
+      Personal exploratory project, August 2026
+    </div>
+
+    <nav class="section-nav" aria-label="Demo sections">
+      <a href="#motivation">Motivation</a>
+      <a href="#a1">Target gate</a>
+      <a href="#a2">LNP screen</a>
+      <a href="#relevance">Relevance</a>
+    </nav>
+
+    <p class="opening">The Liu Lab couples intracranial convection-enhanced delivery with CRISPR screens and single-cell readouts to find glioblastoma vulnerabilities that depend on treatment and tumor context. Its next delivery problem is especially interesting: the best CRISPRoff target is only useful if an LNP can carry the mRNA and sgRNA into enough tumor cells without losing the relevant biological signal.</p>
+    <p class="opening">I built a replicate-aware target gate over the lab's public CRISPRi screen and connected it to the lab's newer human GBM43 CED Perturb-seq analysis. It turns two public datasets into a shortlist for payload-bearing LNP tests, then lays out the controls and readouts needed to tell a delivery failure from a biological failure.</p>
+
+    <hr id="motivation">
+    <section aria-labelledby="how-heading">
+      <h2 id="how-heading">How it works</h2>
+      <p>The 2024 GL261 screen reports three gene-level phenotypes across two biological replicates: untreated growth (gamma), growth under radiation (tau), and the radiation-normalized effect (rho). Negative rho values nominate perturbations that make cells less fit specifically under radiation. The first analysis applies transparent thresholds to all 10,252 genes; the second asks whether the same target was modeled in the lab's 18,938-cell human GBM43 CED dataset and converts that evidence into a two-stage LNP screen.</p>
+    </section>
+
+    <hr id="a1">
+    <section aria-labelledby="analysis-one-heading">
+      <h2 id="analysis-one-heading">Analysis 1 — Gate a payload target, not just a screen hit</h2>
+      <div class="experiment">
+        <div class="exp-label">Measured data</div>
+        <div class="exp-title">Genome-scale GL261 CRISPRi screen, two biological replicates</div>
+        <p>Adjust the gate, inspect every gene, and separate a radiation-specific phenotype from general growth loss. The plot uses all rows for filtering; non-hit background points are thinned only for browser rendering.</p>
+      </div>
+
+      <div class="panel">
+        <form class="searchbar" id="target-form">
+          <label class="sr-only" for="target-select">Gene target</label>
+          <input id="target-select" list="target-options" autocomplete="off" placeholder="e.g. Prkdc">
+          <datalist id="target-options"></datalist>
+          <button type="submit">Inspect</button>
+        </form>
+        <div class="chips" id="suggestions"><span>Try:</span></div>
+
+        <fieldset class="gate-controls">
+          <legend>Candidate gate</legend>
+          <label>Minimum |rho| <strong id="effect-label">0.30</strong>
+            <input id="effect-threshold" type="range" min="0.10" max="1.50" step="0.05" value="0.30">
+          </label>
+          <label>Maximum p value
+            <select id="p-threshold">
+              <option value="0.01">0.01</option>
+              <option value="0.05" selected>0.05</option>
+              <option value="0.10">0.10</option>
+              <option value="0.20">0.20</option>
+            </select>
+          </label>
+          <label>Direction
+            <select id="direction-filter">
+              <option value="sensitizer" selected>Sensitizing (rho &lt; 0)</option>
+              <option value="protector">Protective (rho &gt; 0)</option>
+              <option value="both">Either direction</option>
+            </select>
+          </label>
+          <label class="check"><input id="require-concordance" type="checkbox" checked> Same direction in both replicates</label>
+          <label class="check"><input id="exclude-growth" type="checkbox" checked> Exclude baseline growth hits</label>
+          <label class="check"><input id="exclude-pseudo" type="checkbox" checked> Exclude pseudo-annotated loci</label>
+        </fieldset>
+
+        <canvas id="volcano" class="viz-canvas" width="600" height="340" role="img" aria-label="Radiation-normalized CRISPRi effect versus significance"></canvas>
+        <figcaption>Rho is the radiation-arm phenotype normalized to untreated growth. Teal points pass the current gate; the black ring marks the selected gene. Source: Liu et al., Genome Biology 2024, Supplementary Table S1.</figcaption>
+
+        <div class="candidate-head">
+          <span class="label-inline">Current shortlist</span>
+          <span id="pass-count" class="candidate-count"></span>
+        </div>
+        <div class="candidate-list" id="candidate-list"></div>
+
+        <div class="target-profile">
+          <div class="target-profile-head">
+            <div>
+              <span class="label-inline">Selected target</span>
+              <strong id="selected-gene">Prkdc</strong>
+            </div>
+            <span id="evidence-badge" class="evidence-badge"></span>
+          </div>
+          <svg id="profile-viz" class="viz" viewBox="0 0 600 235" role="img" aria-label="Replicate-level gamma, rho, and tau phenotypes"></svg>
+          <div class="readout" id="target-readout" aria-live="polite"></div>
+          <div id="guide-record" class="guide-record"></div>
+        </div>
+
+        <div class="value-pair">
+          <p><strong>What this lets the lab do:</strong> <span id="lab-action">change the evidence gate and see which payload target still deserves an intracranial delivery test.</span></p>
+          <p><strong>Where Cathy adds value:</strong> I joined replicate-level screen phenotypes, guide records, and the lab's CED Perturb-seq classes into one reusable candidate check.</p>
+        </div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric"><span class="metric-val" id="metric-one">10,252</span><span class="metric-desc">genes screened</span></div>
+        <div class="metric"><span class="metric-val" id="metric-two">63</span><span class="metric-desc">author-called rho hits</span></div>
+        <div class="metric"><span class="metric-val" id="metric-three">21</span><span class="metric-desc" id="metric-three-label">pass the default two-replicate gate</span></div>
+      </div>
+    </section>
+
+    <hr id="a2">
+    <section aria-labelledby="analysis-two-heading">
+      <h2 id="analysis-two-heading">Analysis 2 — Turn the target into a delivery experiment</h2>
+      <div class="experiment">
+        <div class="exp-label">Cross-model evidence + proposed next experiment</div>
+        <div class="exp-title">Human GBM43 CED Perturb-seq, then payload-specific LNP validation</div>
+        <p>The Liu Lab notebook modeled 30 gene perturbations across 18,938 cells and assigned only PRKDC, RIF1, and CENPT to an RT-dependent class. Use that evidence to decide whether a target should enter the smaller, more expensive payload-bearing formulation test.</p>
+      </div>
+
+      <div class="panel">
+        <span class="label-inline">Repository-derived in vivo classes</span>
+        <div class="class-selector" id="class-selector"></div>
+        <div class="class-detail" id="class-detail"></div>
+
+        <fieldset class="screen-controls">
+          <legend>Proposed two-stage screen</legend>
+          <label>Reporter-stage formulations <strong id="formulation-label">12</strong>
+            <input id="formulation-count" type="range" min="4" max="24" step="2" value="12">
+          </label>
+          <label>Biological replicates per confirmatory arm
+            <select id="replicate-count">
+              <option value="4" selected>4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <div class="screen-plan" id="screen-plan"></div>
+
+        <div class="benchmark-controls">
+          <label>Public intracerebral MC3 benchmark
+            <select id="brain-site">
+              <option value="striatum" selected>Striatum</option>
+              <option value="hippocampus">Hippocampus</option>
+            </select>
+          </label>
+          <label>Minimum editing fraction <strong id="editing-label">5%</strong>
+            <input id="editing-floor" type="range" min="1" max="10" step="1" value="5">
+          </label>
+        </div>
+        <div class="benchmark-bars" id="benchmark-bars"></div>
+        <figcaption>Reported brain-tissue context, not GBM efficacy: MC3 LNP delivery after intracerebral injection achieved 52%/49% local Cre-mRNA transfection but 7%/3% Cas9-mRNA + sgRNA editing in striatum/hippocampus. This gap is why reporter delivery cannot substitute for payload-specific editing QC.</figcaption>
+
+        <div class="value-pair">
+          <p><strong>What this lets the lab do:</strong> distinguish formulation delivery, target engagement, and treatment-dependent biology before committing to a survival cohort.</p>
+          <p><strong>Where Cathy adds value:</strong> I translated the screen evidence into an experiment with a non-targeting payload, benchmark LNP, payload-free control, IVIS, RT-qPCR or methylation, guide capture, and an explicit go/no-go decision.</p>
+        </div>
+      </div>
+      <p>The recommendation changes with the target and with the minimum editing fraction. A formulation that produces a strong reporter signal but misses the editing floor should return to formulation or payload optimization; it should not be interpreted as evidence that the biological target failed.</p>
+    </section>
+
+    <hr id="relevance">
+    <section aria-labelledby="relevance-heading">
+      <h2 id="relevance-heading">Why this matters for the lab</h2>
+      <p>PRKDC is a useful test case because it is the strongest radiation-sensitizing hit in the GL261 screen (mean rho −1.97; −2.27 and −1.68 across replicates) and it reappears in the human GBM43 CED analysis as one of only three RT-dependent perturbations. That does not prove an LNP–CRISPRoff therapy will work, but it gives the delivery experiment a stronger biological anchor and a clear failure tree.</p>
+
+      <h2>What I would bring</h2>
+      <p>I would bring hands-on mouse GBM, IVIS, tissue collection, cell culture, RT-qPCR, flow cytometry, and assay-documentation experience alongside Python and R analysis. That combination is useful here because formulation QC, intracranial execution, target engagement, single-cell readouts, and computational interpretation have to stay connected.</p>
+
+      <h2>Methods note</h2>
+      <p class="methods-note">This is a processed-data analysis of the authors' open supplementary workbooks plus a structured extension of the executed Liu Lab notebook at commit <a href="https://github.com/liuj-lab/human_gbm_dnapk_public/tree/53c8ccf057461a4efff329aadc3794598147ef28">53c8ccf</a>. Primary sources: <a href="https://doi.org/10.1186/s13059-024-03404-6">Liu et al. 2024</a>, the <a href="https://doi.org/10.5281/zenodo.20334626">GBM43 Zenodo record</a>, the <a href="https://doi.org/10.21203/rs.3.rs-9657955/v1">2026 GBM43 preprint</a>, and the <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10760911/">intracerebral MC3 benchmark</a>. The genome-scale data are mouse GL261 and in vitro; the human GBM43 study is a preprint; CRISPRi and CRISPRoff are not interchangeable; and no public Berkeley formulation measurements were available. LNP labels, QC gates, and the two-stage design are proposals, not Liu Lab SOPs.</p>
+    </section>
+
+    <footer>
+      Cathy Liu · <a href="mailto:cathyliu014@gmail.com">cathyliu014@gmail.com</a> · <a href="tel:+14152163799">415-216-3799</a><br>
+      Epilepsy neurostimulation project, <a href="https://arxiv.org/abs/2606.04339">arXiv:2606.04339</a>
+    </footer>
+  </main>
+
+  <script src="data.js?v=1"></script>
+  <script src="app.js?v=1"></script>
+</body>
+</html>
